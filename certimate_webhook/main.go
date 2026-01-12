@@ -31,8 +31,13 @@ type AppConfig struct {
 
 var appConfig AppConfig
 
+func version() string {
+	return "v0.0.1"
+}
+
 func main() {
 	// 通过 flag 读取配置
+	flagVersion := flag.Bool("v", false, "print version and exit")
 	configPath := flag.String("config", "/etc/certimate_webhook/config.yaml", "config file path")
 	flagPort := flag.String("port", "", "port to listen on")
 	flagWebhookURL := flag.String("webhook-url", "", "webhook url")
@@ -40,17 +45,27 @@ func main() {
 	flagStoragePath := flag.String("storage-path", "", "storage path")
 	flag.Parse()
 
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	if *flagVersion {
+		log.Println("certimate_webhook " + version())
+		os.Exit(0)
+	}
+
+	log.Println("starting certimate_webhook " + version() + "...")
+
 	// 读取配置文件
 	config, err := os.ReadFile(*configPath)
 	if err != nil {
-		log.Fatalf("read config file: %s\n", err)
+		log.Fatalf("read config file failed: %s\n", err)
+		os.Exit(1)
 	}
 
 	// 解析配置文件
 	var appConfig AppConfig
 	err = yaml.Unmarshal(config, &appConfig)
 	if err != nil {
-		log.Fatalf("unmarshal config: %s\n", err)
+		log.Fatalf("unmarshal config failed: %s\n", err)
+		os.Exit(1)
 	}
 
 	// flag 优先级高于配置文件
@@ -67,8 +82,33 @@ func main() {
 		appConfig.StoragePath = *flagStoragePath
 	}
 
+	// 如果 secret 为空，不允许启动
+	if appConfig.WebhookSecret == "" {
+		log.Fatalf("webhook secret is empty, please set webhook-secret in config file or use -webhook-secret flag\n")
+		os.Exit(1)
+	}
+
+	// 验证 webhook-url 是否以 / 开头
+	if appConfig.WebhookURL != "" && appConfig.WebhookURL[0] != '/' {
+		log.Fatalf("webhook-url must start with /, please set webhook-url in config file or use -webhook-url flag\n")
+		os.Exit(1)
+	}
+
+	// 创建 storage 目录
+	log.Println("trusting storage directory: " + filepath.Clean(appConfig.StoragePath))
+	err = os.MkdirAll(filepath.Clean(appConfig.StoragePath), 0755)
+	if err != nil {
+		log.Fatalf("create storage directory failed: %s\n", err)
+		os.Exit(1)
+	}
+
 	// 创建一个 chi 路由
 	router := chi.NewRouter()
+
+	// 注册 NotFound 路由
+	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Not Found", http.StatusNotFound)
+	})
 
 	// 注册 webhook 路由
 	router.Post(appConfig.WebhookURL, handleWebhook)
@@ -78,18 +118,17 @@ func main() {
 		Addr:    ":" + appConfig.Port,
 		Handler: router,
 	}
+	log.Println("certimate_webhook is running on port " + appConfig.Port)
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("start server failed: %s\n", err)
-		} else {
-			log.Println("certimate_webhook is running on port " + appConfig.Port)
+			os.Exit(1)
 		}
 	}()
 
 	// 等待信号
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
 	<-quit
 
 	log.Println("shutting down certimate_webhook...")
@@ -99,10 +138,9 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatalf("shutdown server failed: %s\n", err)
-	} else {
-		log.Println("certimate_webhook is shutdown")
 	}
 	log.Println("certimate_webhook is shutdown")
+	os.Exit(0)
 }
 
 type WebhookRequest struct {
