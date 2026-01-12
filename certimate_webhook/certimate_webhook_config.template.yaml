@@ -1,0 +1,9 @@
+# certimate_webhook config template
+# 端口
+port: 9880
+# webhook 地址
+webhook-url: /webhook
+# webhook 密钥
+webhook-secret:
+# ssl 存储路径
+storage-path: /etc/certimate_webhook/ssl

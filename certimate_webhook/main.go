@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"gopkg.in/yaml.v3"
 )
 
 // This is the main package for the certimate webhook
@@ -22,27 +23,48 @@ import (
 // /webhook 路径接收 certimate 的 webhook 请求
 
 type AppConfig struct {
-	Port          string
-	WebhookURL    string
-	WebhookSecret string
-	StoragePath   string
+	Port          string `yaml:"port" mapstructure:"port"`
+	WebhookURL    string `yaml:"webhook-url" mapstructure:"webhook-url"`
+	WebhookSecret string `yaml:"webhook-secret" mapstructure:"webhook-secret"`
+	StoragePath   string `yaml:"storage-path" mapstructure:"storage-path"`
 }
 
 var appConfig AppConfig
 
 func main() {
 	// 通过 flag 读取配置
-	port := flag.String("port", "8080", "port to listen on")
-	webhookURL := flag.String("webhook-url", "/webhook", "webhook url")
-	webhookSecret := flag.String("webhook-secret", "", "webhook secret")
-	storagePath := flag.String("storage-path", "./ssl", "storage path")
+	configPath := flag.String("config", "/etc/certimate_webhook/config.yaml", "config file path")
+	flagPort := flag.String("port", "", "port to listen on")
+	flagWebhookURL := flag.String("webhook-url", "", "webhook url")
+	flagWebhookSecret := flag.String("webhook-secret", "", "webhook secret")
+	flagStoragePath := flag.String("storage-path", "", "storage path")
 	flag.Parse()
 
-	appConfig = AppConfig{
-		Port:          *port,
-		WebhookURL:    *webhookURL,
-		WebhookSecret: *webhookSecret,
-		StoragePath:   *storagePath,
+	// 读取配置文件
+	config, err := os.ReadFile(*configPath)
+	if err != nil {
+		log.Fatalf("read config file: %s\n", err)
+	}
+
+	// 解析配置文件
+	var appConfig AppConfig
+	err = yaml.Unmarshal(config, &appConfig)
+	if err != nil {
+		log.Fatalf("unmarshal config: %s\n", err)
+	}
+
+	// flag 优先级高于配置文件
+	if *flagPort != "" {
+		appConfig.Port = *flagPort
+	}
+	if *flagWebhookURL != "" {
+		appConfig.WebhookURL = *flagWebhookURL
+	}
+	if *flagWebhookSecret != "" {
+		appConfig.WebhookSecret = *flagWebhookSecret
+	}
+	if *flagStoragePath != "" {
+		appConfig.StoragePath = *flagStoragePath
 	}
 
 	// 创建一个 chi 路由
@@ -58,21 +80,29 @@ func main() {
 	}
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
+			log.Fatalf("start server failed: %s\n", err)
+		} else {
+			log.Println("certimate_webhook is running on port " + appConfig.Port)
 		}
 	}()
 
 	// 等待信号
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	<-quit
+
+	log.Println("shutting down certimate_webhook...")
 
 	// 优雅关闭
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("shutdown: %s\n", err)
+		log.Fatalf("shutdown server failed: %s\n", err)
+	} else {
+		log.Println("certimate_webhook is shutdown")
 	}
-	log.Println("shutdown complete")
+	log.Println("certimate_webhook is shutdown")
 }
 
 type WebhookRequest struct {
