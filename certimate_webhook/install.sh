@@ -5,12 +5,6 @@
 # 从 github 下载 install.sh 脚本 并执行
 # wget -qO- https://github.com/JaxhLee/raw_go/raw/refs/heads/main/certimate_webhook/install.sh | bash
 
-# 判断是否支持 systemctl，如果不支持，则退出
-if ! command -v systemctl >/dev/null 2>&1; then
-    echo "请先安装 systemctl"
-    exit 1
-fi
-
 # 生成随机密码
 WEBHOOK_SECRET=$(openssl rand -hex 32)
 
