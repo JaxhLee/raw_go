@@ -3,13 +3,13 @@
 # 安装 certimate_webhook 二进制文件
 # 运行此脚本：
 # 从 github 下载 install.sh 脚本 并执行
-# wget -qO- https://github.com/JaxhLee/raw_go/raw/refs/heads/main/certimate_webhook/install.sh | bash
+# wget -qO- https://raw.githubusercontent.com/JaxhLee/raw_go/refs/heads/main/certimate_webhook/install.sh | bash
 
 # 生成随机密码
 WEBHOOK_SECRET=$(openssl rand -hex 32)
 
 # 从 github 下载 certimate_webhook 二进制文件
-DOWNLOAD_URL="https://github.com/JaxhLee/raw_go/raw/refs/heads/main/certimate_webhook/certimate_webhook_linux_amd64"
+DOWNLOAD_URL="https://raw.githubusercontent.com/JaxhLee/raw_go/refs/heads/main/certimate_webhook/certimate_webhook_linux_amd64"
 wget -O certimate_webhook_linux_amd64 $DOWNLOAD_URL
 
 # 创建 certimate_webhook 目录
