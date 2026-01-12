@@ -3,7 +3,7 @@
 # 安装 certimate_webhook 二进制文件
 # 运行此脚本：
 # 从 github 下载 install.sh 脚本
-# wget https://github.com/JaxhLee/raw_go/releases/download/certimate_webhook/install.sh
+# wget https://github.com/JaxhLee/raw_go/raw/refs/heads/main/certimate_webhook/install.sh
 # chmod +x install.sh
 # ./install.sh
 
@@ -17,12 +17,18 @@ fi
 WEBHOOK_SECRET=$(openssl rand -hex 32)
 
 # 从 github 下载 certimate_webhook 二进制文件
-DOWNLOAD_URL="https://github.com/JaxhLee/raw_go/releases/download/certimate_webhook/certimate_webhook_linux_amd64"
+DOWNLOAD_URL="https://github.com/JaxhLee/raw_go/raw/refs/heads/main/certimate_webhook/certimate_webhook_linux_amd64"
 wget -O certimate_webhook_linux_amd64 $DOWNLOAD_URL
 
-# 移动二进制文件到 /usr/local/bin/
+# 创建 certimate_webhook 目录
+mkdir -p /etc/certimate_webhook
+
+# 移动二进制文件到 /etc/certimate_webhook/
 mv certimate_webhook_linux_amd64 /etc/certimate_webhook/certimate_webhook
 chmod +x /etc/certimate_webhook/certimate_webhook
+
+# 创建 ssl 目录
+mkdir -p /etc/certimate_webhook/ssl
 
 # 创建 systemd 服务文件
 cat <<EOF > /etc/systemd/system/certimate_webhook.service
